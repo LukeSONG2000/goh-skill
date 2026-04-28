@@ -6,7 +6,7 @@ user-invocable: true
 allowed-tools:
   - Bash(python3 {baseDir}/goh.py *)
 metadata: >-
-  {"openclaw":{"requires":{"anyBins":["python3"],"bins":["python3"],"install":[{"id":"pip-curl-cffi","kind":"pip","package":"curl_cffi","label":"Install curl_cffi (pip)"},{"id":"pip-drissionpage","kind":"pip","package":"DrissionPage","label":"Install DrissionPage (pip)"}]},"emoji":"🎮","os":["darwin","linux"]}}
+  {"openclaw":{"requires":{"anyBins":["python3"],"bins":["python3"],"install":[{"id":"pip-curl-cffi","kind":"pip","package":"curl_cffi","label":"Install curl_cffi (pip)"},{"id":"pip-drissionpage","kind":"pip","package":"DrissionPage","label":"Install DrissionPage 4.1+ (pip, 需图形界面Chrome 115-146, 如遇WebSocket错误请升级pip包)"}]},"emoji":"🎮","os":["darwin","linux"]}}
 ---
 
 ## 触发规则
@@ -37,9 +37,27 @@ metadata: >-
 ## 依赖
 
 - `python3` 3.9+
-- `curl_cffi` — API 请求（TLS 指纹伪装）
-- `DrissionPage` — CF Turnstile 绕过（best-mods、GAC counters）
-- Chromium 系浏览器（Chrome/Chromium/Edge，自动检测，需图形界面）
+- `curl_cffi` — API 请求（TLS 指纹伪装），`pip install curl_cffi`
+- `DrissionPage` — CF Turnstile 绕过，`pip install DrissionPage`（**需 4.1.0+**）
+- **图形界面的 Chromium 系浏览器**（headed 模式，CF Turnstile 必须有真实渲染环境）
+  - 自动检测顺序：Chrome > Chromium > Edge
+  - **必须是有头浏览器（headed）**，headless 会被 CF 拦截
+  - **Chrome 版本需与 DrissionPage 兼容**：DrissionPage 4.1.x 支持 Chrome 115-131。如果环境是 Chrome 132+（如 Chrome 146），需升级 DrissionPage 到最新版（`pip install --upgrade DrissionPage`），或安装兼容的 Chrome 版本
+  - macOS 路径：`/Applications/Google Chrome.app`、`/Applications/Chromium.app`、`/Applications/Microsoft Edge.app`
+  - Linux 路径：`/usr/bin/google-chrome`、`/usr/bin/chromium-browser`、`/snap/bin/chromium`
+
+### 命令与数据源对照
+
+| 命令 | 数据源 | 需要浏览器 |
+|------|--------|-----------|
+| `characters` / `abilities` / `ships` / `gear` | `/api/` 直连 | 否 |
+| `gac config` | `/api/v1/` 直连 | 否 |
+| `gac counters` | `/gac/counters/` 页面 | **是** |
+| `stats` | `/units/` 页面 | **是** |
+| `mods` | `/characters/*/best-mods/` 页面 | **是** |
+| `names` / `search` / `cache` | 本地文件 / API | 否 |
+
+**如果浏览器不可用或版本不兼容**，`stats`、`mods`、`gac counters` 命令会失败并提示错误。其余命令正常工作。
 
 ## 命令参考
 
@@ -116,7 +134,9 @@ goh cache --clear               # 清除全部缓存
 ## 注意事项
 
 - **API 数据**通过 `curl_cffi` 直接访问 `/api/`，缓存 24h（GAC 1h，mods 12h）
-- **Best mods / GAC counters** 受 CF Turnstile 保护，需 DrissionPage headed 模式（5-10s 过 CF）
-- **浏览器兼容**：自动检测 Chrome > Chromium > Edge，支持 macOS 和 Linux
-- **Cookie 不可跨客户端复用**：CF `cf_clearance` 绑定 TLS 指纹
+- **stats / mods / gac counters** 受 CF Turnstile 保护，需 DrissionPage **headed 模式**（真实图形界面浏览器，5-10s 过 CF）。headless / curl / fetch 全部被 403
+- **DrissionPage 与 Chrome 版本必须兼容**：如果遇到 `WebSocket handshake failed` 或 `Protocol error`，说明版本不匹配。解决方案：
+  1. 升级 DrissionPage：`pip install --upgrade DrissionPage`
+  2. 或降级 Chrome 到 115-131 范围
+- **Cookie 不可跨客户端复用**：CF `cf_clearance` 绑定 TLS 指纹，DrissionPage 提取的 cookie 给 curl_cffi 用仍然 403
 - `--force` 跳过缓存 | `--json` 输出原始 JSON
