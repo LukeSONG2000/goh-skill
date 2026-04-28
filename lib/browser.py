@@ -8,7 +8,7 @@ from typing import Optional, List
 from DrissionPage import ChromiumPage, ChromiumOptions
 
 from . import cache
-from .parse import parse_best_mods
+from .parse import parse_best_mods, parse_character_stats
 
 logger = logging.getLogger(__name__)
 
@@ -255,3 +255,60 @@ def fetch_gac_counters(base_id: str, season_id: Optional[str] = None,
         "battle_count": battle_count,
         "counters": counters,
     }
+
+
+def fetch_character_stats(slug: str, gear_tier: Optional[str] = None,
+                          force: bool = False) -> Optional[dict]:
+    """Fetch and parse character stats from /units/{slug}/ page.
+
+    Args:
+        slug: Character URL slug (e.g. 'jedi-knight-luke-skywalker')
+        gear_tier: Optional gear tier (e.g. 'RELIC_7'). Default: Gear 12.
+        force: Bypass cache.
+
+    Returns:
+        Dict with base_id, name, slug, gear_tier, power, sections, or None.
+    """
+    url = f"{BASE_URL}/units/{slug}/"
+    cache_key = f"stats/{slug}"
+    html = fetch_page_html(url, cache_key=cache_key, force=force)
+    if html is None:
+        return None
+
+    stats = parse_character_stats(html, slug)
+
+    # If a specific gear tier is requested, use DrissionPage to select it
+    if gear_tier and gear_tier != stats.get("gear_tier"):
+        stats = _fetch_stats_at_gear_tier(slug, gear_tier, stats, force)
+
+    return stats
+
+
+def _fetch_stats_at_gear_tier(slug: str, gear_tier: str, default_stats: dict,
+                               force: bool = False) -> dict:
+    """Re-fetch stats with a specific gear tier selected via dropdown."""
+    try:
+        page = _ensure_page()
+        url = f"{BASE_URL}/units/{slug}/"
+        page.get(url)
+        if not _wait_cf_clear(page):
+            return default_stats
+        time.sleep(SPA_RENDER_WAIT)
+
+        # Select the gear tier from dropdown
+        select = page.ele('tag:select@@class:select')
+        if select:
+            select.select(gear_tier)
+            time.sleep(1)  # Wait for stats to update
+
+            # Re-parse from the updated DOM
+            stat_div = page.ele('class:stat-table-data')
+            if stat_div:
+                html = stat_div.html
+                new_stats = parse_character_stats(html, slug)
+                new_stats["gear_tier"] = gear_tier
+                return new_stats
+    except Exception as e:
+        logger.error("Failed to select gear tier %s: %s", gear_tier, e)
+
+    return default_stats

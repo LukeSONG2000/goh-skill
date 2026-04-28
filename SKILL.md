@@ -14,7 +14,7 @@ metadata: >-
 当用户对话涉及以下内容时，应主动使用本 skill 查询并回复：
 
 - SWGOH / swgoh / 星球大战银河英雄传 / 银河英雄传 / GAC
-- 角色的 mod / 插件 / 配队 / counter / 技能 / 属性 / 数据
+- 角色的 mod / 插件 / 配队 / counter / 技能 / 属性 / 数据 / 速度 / 血量 / Speed / Health / Protection
 - 舰船编队 / 装备 / Gear / Relic
 - 具体角色名（英文或中文），如 "老卢"、"JML"、"Darth Vader"、"达斯维达"
 - GAC 赛季配置、counter 关系、胜率、banner
@@ -63,6 +63,20 @@ goh abilities [--json] [--force] [--filter KEYWORD]  # 所有技能（1796+）
 goh ships [--json] [--force]      # 所有飞船（70+），已关联 cn/nickname
 goh gear [--json] [--force]       # 所有装备（694+）
 ```
+
+### 角色属性（需 DrissionPage headed 过 CF）
+
+```bash
+goh stats darth-vader [--json] [--gear-tier RELIC_7]  # 单角色属性
+goh stats "老卢" --json                                # 支持中文查询
+goh stats JMK --gear-tier RELIC_9                      # 指定 Gear/Relic 等级
+```
+
+返回：Power、Health、Protection、Speed、Critical Damage/Chance、Potency、Tenacity、
+Physical/Special Offense（Damage、Armor Penetration、Accuracy）、
+Physical/Special Survivability（Armor、Dodge、Critical Avoidance）等。
+
+Gear Tier 选项：`GEAR_12`、`GEAR_13`、`RELIC_1` ~ `RELIC_10`，默认 `GEAR_12`。
 
 ### GAC 数据
 

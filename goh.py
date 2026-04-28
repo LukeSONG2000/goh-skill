@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lib import api, browser, cache, parse, names as names_lib
+from lib.parse import character_stats_to_markdown
 
 
 def _resolve_name(query: str):
@@ -225,6 +226,33 @@ def cmd_gac(args):
         sys.exit(1)
 
 
+def cmd_stats(args):
+    base_id, slug = _resolve_name(args.character)
+    if not slug:
+        print(f"Character not found: {args.character}", file=sys.stderr)
+        sys.exit(1)
+
+    stats = browser.fetch_character_stats(
+        slug,
+        gear_tier=args.gear_tier,
+        force=args.force,
+    )
+    if stats is None:
+        print(f"Failed to fetch stats for {slug}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.json:
+        json.dump(stats, sys.stdout, ensure_ascii=False, indent=2)
+    else:
+        # Resolve CN name if available
+        all_names = names_lib.get_all()
+        entry = all_names.get(base_id, {})
+        cn = entry.get("cn", "")
+        if cn and "name" in stats:
+            stats["name"] = f"{stats['name']}（{cn}）"
+        print(character_stats_to_markdown(stats))
+
+
 def cmd_mods(args):
     base_id, slug = _resolve_name(args.character)
     if not slug:
@@ -352,6 +380,12 @@ def main():
     p_counters.add_argument("--sort", default="win_pct", choices=["win_pct", "count", "banners"])
     p_counters.add_argument("--exclude-gl", action="store_true", help="Exclude Galactic Legends")
 
+    # stats
+    p_stats = subparsers.add_parser("stats", help="Character detail stats (Speed, Health, etc.)")
+    p_stats.add_argument("character", help="Character name, base_id, or slug")
+    p_stats.add_argument("--gear-tier", default=None,
+                         help="Gear tier (e.g. RELIC_7). Default: Gear 12")
+
     # mods
     p_mods = subparsers.add_parser("mods", help="Best mods for a character")
     p_mods.add_argument("character", help="Character name, base_id, or slug")
@@ -382,6 +416,7 @@ def main():
         "ships": cmd_ships,
         "gear": cmd_gear,
         "gac": cmd_gac,
+        "stats": cmd_stats,
         "mods": cmd_mods,
         "search": cmd_search,
         "cache": cmd_cache,

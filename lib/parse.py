@@ -188,6 +188,125 @@ def parse_best_mods(html: str, slug: str, slice_name: str = "KYBER") -> BestMods
     return result
 
 
+def parse_character_stats(html: str, slug: str) -> dict:
+    """Parse character stats from /units/{slug}/ page HTML.
+
+    Returns dict with:
+        base_id, name, slug, gear_tier, power,
+        sections: {section_name: {stat_name: value, ...}, ...}
+    """
+    result = {
+        "slug": slug,
+        "sections": {},
+    }
+
+    # Extract base_id from data-base-id
+    m = re.search(r'data-base-id="([A-Z0-9]+)"', html)
+    if m:
+        result["base_id"] = m.group(1)
+
+    # Extract character name from title
+    m = re.search(r'<title>([^|<]+)', html)
+    if m:
+        name = m.group(1).strip()
+        # Clean: "Jedi Knight Luke Skywalker - Star Wars Galaxy of Heroes - SWGOH.GG"
+        # → "Jedi Knight Luke Skywalker"
+        for suffix in [" - Star Wars Galaxy of Heroes", " - SWGOH.GG", "SWGOH.GG"]:
+            name = name.replace(suffix, "")
+        result["name"] = name.strip().strip("-").strip()
+
+    # Extract selected gear tier (or default first option)
+    selected = re.search(r'<option[^>]*selected[^>]*value="([^"]+)"', html)
+    if selected:
+        result["gear_tier"] = selected.group(1)
+    else:
+        first_opt = re.search(r'<option\s+value="([^"]+)"', html)
+        if first_opt:
+            result["gear_tier"] = first_opt.group(1)
+
+    # Parse sections and stats directly from full HTML
+    # (the stat-table-data div is deeply nested, regex boundary detection is unreliable)
+    current_section = "Overview"
+    sections = {}
+
+    # Build ordered list of (position, type, content) to sort titles before entries
+    items = []
+
+    # Find all section titles
+    for title_m in re.finditer(r'stat-table-data__title">(.*?)</div>', html, re.DOTALL):
+        section_name = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
+        if section_name:
+            items.append((title_m.start(), "title", section_name))
+
+    # Find all label + value pairs
+    for entry_m in re.finditer(
+        r'stat-table-data__entry-primary-label">(.*?)</div>\s*'
+        r'<div class="stat-table-data__entry-primary-value">(.*?)</div>',
+        html, re.DOTALL
+    ):
+        raw_label = entry_m.group(1).strip()
+        raw_value = entry_m.group(2).strip()
+        label = re.sub(r'<[^>]+>', '', raw_label).strip()
+        value = re.sub(r'<[^>]+>', '', raw_value).strip()
+        if label and value:
+            items.append((entry_m.start(), "entry", (label, value)))
+
+    # Process in order so titles set the current_section before entries
+    items.sort(key=lambda x: x[0])
+    for pos, item_type, content in items:
+        if item_type == "title":
+            current_section = content
+            if current_section not in sections:
+                sections[current_section] = {}
+        elif item_type == "entry":
+            label, value = content
+            if current_section not in sections:
+                sections[current_section] = {}
+
+            num_val = value.replace(',', '').replace('%', '')
+            try:
+                num_val = float(num_val)
+                if num_val == int(num_val) and '%' not in value:
+                    num_val = int(num_val)
+                sections[current_section][label] = {"display": value, "value": num_val}
+            except ValueError:
+                sections[current_section][label] = {"display": value, "value": value}
+
+            if label == "Power":
+                result["power"] = value
+
+    result["sections"] = sections
+    return result
+
+
+def character_stats_to_markdown(stats: dict) -> str:
+    """Format character stats as Markdown."""
+    lines = []
+    name = stats.get("name", stats.get("slug", ""))
+    base_id = stats.get("base_id", "")
+    gear = stats.get("gear_tier", "Unknown")
+    power = stats.get("power", "")
+
+    header = name
+    if base_id:
+        header += f" ({base_id})"
+    lines.append(f"# {header}")
+    lines.append(f"Gear Tier: {gear}" + (f" | Power: {power}" if power else ""))
+    lines.append("")
+
+    sections = stats.get("sections", {})
+    for section_name, stats_dict in sections.items():
+        lines.append(f"## {section_name}")
+        lines.append("| Stat | Value |")
+        lines.append("|------|-------|")
+        for stat_name, stat_val in stats_dict.items():
+            display = stat_val["display"] if isinstance(stat_val, dict) else stat_val
+            lines.append(f"| {stat_name} | {display} |")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def best_mods_to_dict(mods: BestMods) -> dict:
     """Convert BestMods to a JSON-serializable dict."""
     d = asdict(mods)
