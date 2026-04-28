@@ -5,8 +5,6 @@ version: 1.0.0
 user-invocable: true
 allowed-tools:
   - Bash(python3 {baseDir}/goh.py *)
-metadata: >-
-  {"openclaw":{"requires":{"anyBins":["python3"],"bins":["python3"],"install":[{"id":"pip-curl-cffi","kind":"pip","package":"curl_cffi","label":"Install curl_cffi (pip)"},{"id":"pip-drissionpage","kind":"pip","package":"DrissionPage","label":"Install DrissionPage 4.1+ (pip, 需图形界面Chrome 115-146, 如遇WebSocket错误请升级pip包)"}]},"emoji":"🎮","os":["darwin","linux"]}}
 ---
 
 ## 触发规则
