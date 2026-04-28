@@ -2,11 +2,33 @@
 name: goh
 description: "SWGOH (Star Wars: Galaxy of Heroes) 数据查询工具。爬取 swgoh.gg 获取角色属性、技能、GAC counter、best mods 等数据。"
 version: 1.0.0
+user-invocable: true
 allowed-tools:
   - Bash(python3 {baseDir}/goh.py *)
 metadata: >-
   {"openclaw":{"requires":{"anyBins":["python3"],"bins":["python3"],"install":[{"id":"pip-curl-cffi","kind":"pip","package":"curl_cffi","label":"Install curl_cffi (pip)"},{"id":"pip-drissionpage","kind":"pip","package":"DrissionPage","label":"Install DrissionPage (pip)"}]},"emoji":"🎮","os":["darwin","linux"]}}
 ---
+
+## 触发规则
+
+当用户对话涉及以下内容时，应主动使用本 skill 查询并回复：
+
+- SWGOH / swgoh / 星球大战银河英雄传 / 银河英雄传 / GAC
+- 角色的 mod / 插件 / 配队 / counter / 技能 / 属性 / 数据
+- 舰船编队 / 装备 / Gear / Relic
+- 具体角色名（英文或中文），如 "老卢"、"JML"、"Darth Vader"、"达斯维达"
+- GAC 赛季配置、counter 关系、胜率、banner
+- Best Mods 推荐、mod 数据分析
+
+## 语言规则
+
+- **使用中文作为主要交流语言**
+- **保持爬取内容的原文**：游戏内英文名称、技能描述、API 返回的原始数据不要自行翻译
+- **中文注释放在括号内**：仅在用户使用中文名查询或首次提到时，在英文名后用括号补充中文，格式：`English Name（中文翻译）`
+  - 示例：Jedi Master Luke Skywalker（绝地大师卢克天行者）
+  - 示例：Critical Damage（暴击伤害）
+  - 已有 cn/nickname 记录的角色直接使用中文，无需再标注英文
+- **缩写/简称直接使用**：如 JML、JMK、SEE、SLKR 等，不需要展开全称
 
 # goh — SWGOH 数据查询
 
