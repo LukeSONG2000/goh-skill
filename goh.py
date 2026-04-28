@@ -250,7 +250,14 @@ def cmd_stats(args):
         cn = entry.get("cn", "")
         if cn and "name" in stats:
             stats["name"] = f"{stats['name']}（{cn}）"
-        print(character_stats_to_markdown(stats))
+        output = character_stats_to_markdown(stats)
+        # Warn if requested gear tier wasn't available
+        if args.gear_tier and stats.get("gear_tier") != args.gear_tier:
+            from lib.parse import GEAR_CN
+            requested = GEAR_CN.get(args.gear_tier, args.gear_tier)
+            actual = GEAR_CN.get(stats["gear_tier"], stats["gear_tier"])
+            output = f"**注意：该角色不支持 {requested}，显示的是 {actual} 数据**\n\n" + output
+        print(output)
 
 
 def cmd_mods(args):

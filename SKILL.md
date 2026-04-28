@@ -13,6 +13,7 @@ allowed-tools:
 
 - SWGOH / swgoh / 星球大战银河英雄传 / 银河英雄传 / GAC
 - 角色的 mod / 插件 / 配队 / counter / 技能 / 属性 / 数据 / 速度 / 血量 / Speed / Health / Protection
+- **更新 goh skill / 更新技能**：触发更新流程
 - 舰船编队 / 装备 / Gear / Relic
 - 具体角色名（英文或中文），如 "老卢"、"JML"、"Darth Vader"、"达斯维达"
 - GAC 赛季配置、counter 关系、胜率、banner
@@ -39,6 +40,14 @@ allowed-tools:
   5. 输出结果
 - **耗时操作提前告知**：需要浏览器的命令（stats、mods、gac counters）需要 5-10 秒过 CF，执行前告知用户
 - **失败时立即反馈**：如果某步失败，不要继续执行后续步骤，立即告知用户错误原因
+- **更新 skill 流程**：当用户说"更新 goh skill"、"更新技能"等类似请求时，执行以下步骤：
+  1. 先确认 skill 目录路径：`{baseDir}`
+  2. 执行 `cd {baseDir} && git fetch origin && git reset --hard origin/main`
+  3. 如果不是 git 仓库，执行：`cd {baseDir}/.. && rm -rf goh-skill && git clone https://github.com/LukeSONG2000/goh-skill.git`
+  4. 清理旧缓存：`python3 {baseDir}/goh.py cache --clear`
+  5. 确认依赖：`pip install --quiet curl_cffi DrissionPage`
+  6. 验证：`python3 {baseDir}/goh.py --help`
+  7. 每步都汇报进展，不要一次性执行完再输出
 
 # goh — SWGOH 数据查询
 

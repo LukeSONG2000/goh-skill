@@ -4,6 +4,71 @@ import re
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional
 
+# English → Chinese stat name mapping
+STAT_CN = {
+    "Power": "战力",
+    "Health": "生命值",
+    "Protection": "护盾",
+    "Speed": "速度",
+    "Critical Damage": "暴击伤害",
+    "Critical Chance": "暴击率",
+    "Potency": "效果命中",
+    "Tenacity": "效果抵抗",
+    "Health Steal": "生命偷取",
+    "Defense Penetration": "防御穿透",
+    "Armor Penetration": "护甲穿透",
+    "Resistance Penetration": "抵抗穿透",
+    "Accuracy": "精准",
+    "Armor": "护甲",
+    "Resistance": "抵抗",
+    "Dodge Rating": "闪避",
+    "Deflection Rating": "偏转",
+    "Critical Avoidance": "暴击回避",
+    "Damage": "伤害",
+    "Mastery": "精通",
+    # Base attributes
+    "Strength (STR)": "力量（STR）",
+    "Agility (AGI)": "敏捷（AGI）",
+    "Tactics (TAC)": "战术（TAC）",
+    "Strength Growth": "力量成长",
+    "Agility Growth": "敏捷成长",
+    "Tactics Growth": "战术成长",
+    # Section names
+    "Base Attributes": "基础属性",
+    "General": "通用属性",
+    "Physical Offense": "物理进攻",
+    "Physical Survivability": "物理防御",
+    "Special Offense": "特殊进攻",
+    "Special Survivability": "特殊防御",
+    "Overview": "概览",
+}
+
+# Gear tier display names
+GEAR_CN = {
+    "GEAR_12": "Gear 12",
+    "GEAR_12_3": "Gear 12+3",
+    "GEAR_12_5": "Gear 12+5",
+    "GEAR_13": "Gear 13",
+}
+for i in range(1, 11):
+    GEAR_CN[f"RELIC_{i}"] = f"Relic {i}"
+
+
+def _stat_cn(en: str) -> str:
+    """Translate English stat name to Chinese, keeping English in parentheses."""
+    cn = STAT_CN.get(en)
+    if cn:
+        return cn
+    return en
+
+
+def _stat_header(en: str) -> str:
+    """Format stat name as: 中文（English）or just English if no translation."""
+    cn = STAT_CN.get(en)
+    if cn and cn != en:
+        return f"{cn}（{en}）"
+    return en
+
 
 @dataclass
 class ModSetEntry:
@@ -280,7 +345,7 @@ def parse_character_stats(html: str, slug: str) -> dict:
 
 
 def character_stats_to_markdown(stats: dict) -> str:
-    """Format character stats as Markdown."""
+    """Format character stats as Markdown with Chinese translations."""
     lines = []
     name = stats.get("name", stats.get("slug", ""))
     base_id = stats.get("base_id", "")
@@ -289,19 +354,21 @@ def character_stats_to_markdown(stats: dict) -> str:
 
     header = name
     if base_id:
-        header += f" ({base_id})"
+        header += f"（{base_id}）"
     lines.append(f"# {header}")
-    lines.append(f"Gear Tier: {gear}" + (f" | Power: {power}" if power else ""))
+    gear_display = GEAR_CN.get(gear, gear)
+    lines.append(f"装备等级: {gear_display}" + (f" | 战力（Power）: {power}" if power else ""))
     lines.append("")
 
     sections = stats.get("sections", {})
     for section_name, stats_dict in sections.items():
-        lines.append(f"## {section_name}")
-        lines.append("| Stat | Value |")
-        lines.append("|------|-------|")
+        lines.append(f"## {_stat_cn(section_name)}")
+        lines.append("| 属性 | 数值 |")
+        lines.append("|------|------|")
         for stat_name, stat_val in stats_dict.items():
             display = stat_val["display"] if isinstance(stat_val, dict) else stat_val
-            lines.append(f"| {stat_name} | {display} |")
+            label = _stat_header(stat_name)
+            lines.append(f"| {label} | {display} |")
         lines.append("")
 
     return "\n".join(lines)
