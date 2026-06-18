@@ -2,7 +2,7 @@
   "host": "127.0.0.1",
   "port": 58931,
   "storeUrl": "https://store.galaxy-of-heroes.starwars.ea.com/",
-  "chromeExecutable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "chromeExecutable": "",
   "headless": false,
   "locale": "en-US",
   "viewport": { "width": 1440, "height": 1000 },

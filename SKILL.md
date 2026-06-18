@@ -7,6 +7,7 @@ allowed-tools:
   - Bash(python3 {baseDir}/goh.py *)
   - Bash(cd {baseDir}/webstore && npm install *)
   - Bash(launchctl *)
+  - Bash(crontab *)
 ---
 
 ## 触发规则
@@ -44,6 +45,7 @@ allowed-tools:
 - **耗时操作提前告知**：需要浏览器的命令（stats、mods、gac counters）需要 5-10 秒过 CF，执行前告知用户
 - **失败时立即反馈**：如果某步失败，不要继续执行后续步骤，立即告知用户错误原因
 - **Webstore 长连接规则**：登录/领取若进入 `awaiting_email` 或 `awaiting_code`，不要重新发起任务；继续用 `webstore email` 或 `webstore code` 推进同一个服务端流程。完成或超时后服务会关闭浏览器。
+- **OpenClaw/QQBot 异步规则**：在群聊、QQBot、OpenClaw 等回复凭证可能过期的环境，不要对领取任务使用 `--wait`。先运行 `webstore claim` 或 `webstore login` 启动任务并立即把状态发回用户；后续通过多轮 `webstore status`、`webstore email`、`webstore code` 推进。
 - **更新 skill 流程**：当用户说"更新 goh skill"、"更新技能"等类似请求时，执行以下步骤：
   1. 先确认 skill 目录路径：`{baseDir}`
   2. 执行 `cd {baseDir} && git fetch origin && git pull --ff-only`
@@ -144,40 +146,43 @@ goh mods "darth-vader,JML" --batch --json      # 批量
 
 用于“帮我领取网络商店”“领取每日好礼”“领取科舍尔航程/Kessel Run”“每天 0 点帮我领取网络商店”等请求。底层是长连接本地服务，服务独立于 agent 对话运行；等待邮箱/验证码时浏览器会保留，登录或领取完成后自动清理浏览器。验证码等待默认 15 分钟，超时自动关闭浏览器避免占用服务器资源。
 
+`webstore status/login/claim/logs/cleanup` 会在本地服务未启动时自动启动服务。macOS 可用 LaunchAgent；Linux/CentOS/OpenClaw 环境会使用后台 Node 进程和 pid 文件，不依赖 `launchctl`。浏览器路径会自动探测 Chrome/Chromium；如果远端没有浏览器，错误会提示设置 `GOH_WEBSTORE_CHROME=/path/to/chrome`。
+
 #### 初始化依赖
 
 首次使用或更新后先执行：
 
 ```bash
 cd {baseDir}/webstore && npm install
-python3 {baseDir}/goh.py webstore install-service
-python3 {baseDir}/goh.py webstore start-service
 python3 {baseDir}/goh.py webstore status
 ```
+
+`status` 会自动拉起服务；只有需要安装开机/常驻守护时再运行 `install-service`。CentOS/OpenClaw 不要使用 `launchctl`。
 
 #### 交互式登录工作流
 
 1. 查询状态：`python3 {baseDir}/goh.py webstore status`
 2. 如果用户说“帮我登录网络商店”：
-   - 如果用户已给邮箱：`python3 {baseDir}/goh.py webstore login --email user@example.com --wait`
-   - 如果没有邮箱：先询问“请输入 EA 账号邮箱”。收到后执行：`python3 {baseDir}/goh.py webstore login --email user@example.com --wait`
+   - OpenClaw/QQBot：如果用户已给邮箱，执行 `python3 {baseDir}/goh.py webstore login --email user@example.com`，立即把返回状态发给用户。
+   - 本地终端调试：可使用 `python3 {baseDir}/goh.py webstore login --email user@example.com --wait`
+   - 如果没有邮箱：先询问“请输入 EA 账号邮箱”。收到后执行：`python3 {baseDir}/goh.py webstore login --email user@example.com`
 3. 如果状态返回 `awaiting_code`：告诉用户“验证码已发送到 <email>，请把 6 位验证码发给我”。
-4. 用户发来验证码后：`python3 {baseDir}/goh.py webstore code 123456 --wait`
+4. 用户发来验证码后，OpenClaw/QQBot 执行：`python3 {baseDir}/goh.py webstore code 123456`；本地终端调试可加 `--wait`。
 5. 完成后复查：`python3 {baseDir}/goh.py webstore status`
 
 #### 领取所有可领取物品
 
 ```bash
-python3 {baseDir}/goh.py webstore claim --wait
+python3 {baseDir}/goh.py webstore claim
 ```
 
 如果未登录且没有邮箱，服务会进入 `awaiting_email`：询问用户邮箱后执行：
 
 ```bash
-python3 {baseDir}/goh.py webstore email user@example.com --wait
+python3 {baseDir}/goh.py webstore email user@example.com
 ```
 
-如果随后进入 `awaiting_code`，按上面的验证码流程继续。不要重新启动浏览器或重复开新任务；继续使用当前长连接状态。
+如果随后进入 `awaiting_code`，按上面的验证码流程继续。不要重新启动浏览器或重复开新任务；继续使用当前长连接状态。本地终端调试时可以加 `--wait`，OpenClaw/QQBot 不要加，避免消息回复凭证过期。
 
 #### 每天 0 点自动领取
 
@@ -185,14 +190,11 @@ python3 {baseDir}/goh.py webstore email user@example.com --wait
 
 ```bash
 cd {baseDir}/webstore && npm install
-python3 {baseDir}/goh.py webstore install-service
-python3 {baseDir}/goh.py webstore start-service
 python3 {baseDir}/goh.py webstore install-daily 0 0
-python3 {baseDir}/goh.py webstore start-daily
 python3 {baseDir}/goh.py webstore status
 ```
 
-如果每日任务发现登录失效，会把服务状态置为 `awaiting_email` 或 `awaiting_code`。后续任意对话中都可以通过 `status` 继续引导，不会因为上一次 agent 对话结束而中断浏览器流程。
+Linux/CentOS/OpenClaw 下 `install-daily` 会写入 crontab；macOS 下会写入 LaunchAgent，可再执行 `start-daily`。如果每日任务发现登录失效，会把服务状态置为 `awaiting_email` 或 `awaiting_code`。后续任意对话中都可以通过 `status` 继续引导，不会因为上一次 agent 对话结束而中断浏览器流程。
 
 #### 清理与排障
 
@@ -200,6 +202,7 @@ python3 {baseDir}/goh.py webstore status
 - 查看日志：`python3 {baseDir}/goh.py webstore logs 200`
 - 重启服务：`python3 {baseDir}/goh.py webstore restart-service`
 - 停止每日任务：`python3 {baseDir}/goh.py webstore stop-daily`
+- Linux/CentOS 浏览器路径：优先安装 `google-chrome` 或 `chromium`；特殊路径可设置 `GOH_WEBSTORE_CHROME=/path/to/chrome`。
 
 安全边界：只领取明确免费的 Webstore 礼物和已达标的 Kessel Run 里程碑；不得点击或调用 `BUY NOW`、真实货币、HKD、水晶/PREMIUM、Pass Plus 等购买动作；不得绕过 EA 验证码/MFA/风控。
 

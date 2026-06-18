@@ -18,10 +18,30 @@ fs.mkdirSync(dataDir, { recursive: true });
 
 const defaults = JSON.parse(fs.readFileSync(path.join(rootDir, 'config/default.json'), 'utf8'));
 const userConfig = fs.existsSync(configFile) ? JSON.parse(fs.readFileSync(configFile, 'utf8')) : {};
+function firstExistingPath(candidates) {
+  return candidates.find(candidate => candidate && fs.existsSync(candidate)) || '';
+}
+function detectChromeExecutable() {
+  return firstExistingPath([
+    process.env.GOH_WEBSTORE_CHROME,
+    userConfig.chromeExecutable,
+    defaults.chromeExecutable,
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/snap/bin/chromium',
+    '/opt/google/chrome/chrome',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  ]);
+}
 const config = {
   ...defaults,
   ...userConfig,
   userDataDir: userConfig.userDataDir || path.join(runtimeDir, 'chrome-profile'),
+  chromeExecutable: detectChromeExecutable(),
 };
 if (!fs.existsSync(configFile)) fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
 if (!fs.existsSync(tokenFile)) fs.writeFileSync(tokenFile, crypto.randomBytes(32).toString('base64url') + '\n', { mode: 0o600 });
@@ -126,6 +146,9 @@ function setPending(context, page, after, email) {
   pending = { context, page, after, email, timeout };
 }
 async function launchBrowser() {
+  if (!config.chromeExecutable) {
+    throw new Error('未找到 Chrome/Chromium。请安装 google-chrome/chromium，或设置 GOH_WEBSTORE_CHROME=/path/to/chrome');
+  }
   return chromium.launchPersistentContext(config.userDataDir, {
     headless: !!config.headless,
     executablePath: config.chromeExecutable,
