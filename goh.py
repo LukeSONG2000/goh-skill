@@ -338,6 +338,20 @@ def cmd_cache(args):
                 print(f"  {key}: {info}")
 
 
+def cmd_webstore(args):
+    """Delegate SWGOH Web Store automation to the Node long-running service client."""
+    import subprocess
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    client = os.path.join(base_dir, "webstore", "bin", "goh-webstore.mjs")
+    if not os.path.exists(client):
+        print(f"Webstore client not found: {client}", file=sys.stderr)
+        sys.exit(1)
+    cmd = ["node", client] + list(args.webstore_args)
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
+
+
 def main():
     # Pre-extract global flags before argparse
     argv = sys.argv[1:]
@@ -408,6 +422,11 @@ def main():
     p_cache.add_argument("--clear", action="store_true", help="Clear cache")
     p_cache.add_argument("key", nargs="?", help="Specific cache key to clear")
 
+    # webstore automation
+    p_webstore = subparsers.add_parser("webstore", help="SWGOH Web Store login and free reward claiming automation")
+    p_webstore.add_argument("webstore_args", nargs=argparse.REMAINDER,
+                            help="Arguments passed to webstore client: status/login/email/code/claim/logs/install-service/start-service/stop-service")
+
     args = parser.parse_args(argv)
     args.json = use_json
     args.force = use_force
@@ -427,6 +446,7 @@ def main():
         "mods": cmd_mods,
         "search": cmd_search,
         "cache": cmd_cache,
+        "webstore": cmd_webstore,
     }
     handler = handlers.get(args.command)
     if handler:

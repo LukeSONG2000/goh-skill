@@ -1,0 +1,17 @@
+{
+  "name": "goh-webstore-automation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SWGOH Web Store login and free reward claim automation service for goh-skill.",
+  "scripts": {
+    "start": "node src/service.mjs",
+    "client": "node bin/goh-webstore.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.61.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

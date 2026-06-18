@@ -1,10 +1,12 @@
 ---
 name: goh
-description: "SWGOH (Star Wars: Galaxy of Heroes) 数据查询工具。爬取 swgoh.gg 获取角色属性、技能、GAC counter、best mods 等数据。"
+description: "SWGOH (Star Wars: Galaxy of Heroes) 工具：查询 swgoh.gg 数据，并自动化登录/领取网络商店免费礼物与 Kessel Run 奖励。"
 version: 1.0.0
 user-invocable: true
 allowed-tools:
   - Bash(python3 {baseDir}/goh.py *)
+  - Bash(cd {baseDir}/webstore && npm install *)
+  - Bash(launchctl *)
 ---
 
 ## 触发规则
@@ -18,6 +20,7 @@ allowed-tools:
 - 具体角色名（英文或中文），如 "老卢"、"JML"、"Darth Vader"、"达斯维达"
 - GAC 赛季配置、counter 关系、胜率、banner
 - Best Mods 推荐、mod 数据分析
+- 网络商店 / webstore / Web Store / 免费礼物 / 每日好礼 / 每天0点领取 / Kessel Run / 科舍尔航程 / 领取奖励
 
 ## 语言规则
 
@@ -40,14 +43,16 @@ allowed-tools:
   5. 输出结果
 - **耗时操作提前告知**：需要浏览器的命令（stats、mods、gac counters）需要 5-10 秒过 CF，执行前告知用户
 - **失败时立即反馈**：如果某步失败，不要继续执行后续步骤，立即告知用户错误原因
+- **Webstore 长连接规则**：登录/领取若进入 `awaiting_email` 或 `awaiting_code`，不要重新发起任务；继续用 `webstore email` 或 `webstore code` 推进同一个服务端流程。完成或超时后服务会关闭浏览器。
 - **更新 skill 流程**：当用户说"更新 goh skill"、"更新技能"等类似请求时，执行以下步骤：
   1. 先确认 skill 目录路径：`{baseDir}`
-  2. 执行 `cd {baseDir} && git fetch origin && git reset --hard origin/main`
-  3. 如果不是 git 仓库，执行：`cd {baseDir}/.. && rm -rf goh-skill && git clone https://github.com/LukeSONG2000/goh-skill.git`
-  4. 清理旧缓存：`python3 {baseDir}/goh.py cache --clear`
-  5. 确认依赖：`pip install --quiet curl_cffi DrissionPage`
-  6. 验证：`python3 {baseDir}/goh.py --help`
-  7. 每步都汇报进展，不要一次性执行完再输出
+  2. 执行 `cd {baseDir} && git fetch origin && git pull --ff-only`
+  3. 如果存在本地未提交改动，停止并说明需要用户决定保留、提交或丢弃；不要自动覆盖。
+  4. 如果不是 git 仓库，先把现有目录改名备份，再执行：`cd {baseDir}/.. && git clone https://github.com/LukeSONG2000/goh-skill.git`
+  5. 清理旧缓存：`python3 {baseDir}/goh.py cache --clear`
+  6. 确认依赖：`pip install --quiet curl_cffi DrissionPage`
+  7. 验证：`python3 {baseDir}/goh.py --help`
+  8. 每步都汇报进展，不要一次性执行完再输出
 
 # goh — SWGOH 数据查询
 
@@ -75,6 +80,7 @@ allowed-tools:
 | `stats` | `/units/` 页面 | **是** |
 | `mods` | `/characters/*/best-mods/` 页面 | **是** |
 | `names` / `search` / `cache` | 本地文件 / API | 否 |
+| `webstore` | EA/SWGOH Web Store | **是** |
 
 **如果浏览器不可用或版本不兼容**，`stats`、`mods`、`gac counters` 命令会失败并提示错误。其余命令正常工作。
 
@@ -132,6 +138,70 @@ goh mods darth-vader [--json] [--slice KYBER]  # 单角色
 goh mods "老卢" --json                           # 支持中文查询
 goh mods "darth-vader,JML" --batch --json      # 批量
 ```
+
+
+### 网络商店自动化（Webstore）
+
+用于“帮我领取网络商店”“领取每日好礼”“领取科舍尔航程/Kessel Run”“每天 0 点帮我领取网络商店”等请求。底层是长连接本地服务，服务独立于 agent 对话运行；等待邮箱/验证码时浏览器会保留，登录或领取完成后自动清理浏览器。验证码等待默认 15 分钟，超时自动关闭浏览器避免占用服务器资源。
+
+#### 初始化依赖
+
+首次使用或更新后先执行：
+
+```bash
+cd {baseDir}/webstore && npm install
+python3 {baseDir}/goh.py webstore install-service
+python3 {baseDir}/goh.py webstore start-service
+python3 {baseDir}/goh.py webstore status
+```
+
+#### 交互式登录工作流
+
+1. 查询状态：`python3 {baseDir}/goh.py webstore status`
+2. 如果用户说“帮我登录网络商店”：
+   - 如果用户已给邮箱：`python3 {baseDir}/goh.py webstore login --email user@example.com --wait`
+   - 如果没有邮箱：先询问“请输入 EA 账号邮箱”。收到后执行：`python3 {baseDir}/goh.py webstore login --email user@example.com --wait`
+3. 如果状态返回 `awaiting_code`：告诉用户“验证码已发送到 <email>，请把 6 位验证码发给我”。
+4. 用户发来验证码后：`python3 {baseDir}/goh.py webstore code 123456 --wait`
+5. 完成后复查：`python3 {baseDir}/goh.py webstore status`
+
+#### 领取所有可领取物品
+
+```bash
+python3 {baseDir}/goh.py webstore claim --wait
+```
+
+如果未登录且没有邮箱，服务会进入 `awaiting_email`：询问用户邮箱后执行：
+
+```bash
+python3 {baseDir}/goh.py webstore email user@example.com --wait
+```
+
+如果随后进入 `awaiting_code`，按上面的验证码流程继续。不要重新启动浏览器或重复开新任务；继续使用当前长连接状态。
+
+#### 每天 0 点自动领取
+
+用户说“每天0点帮我领取网络商店”时：
+
+```bash
+cd {baseDir}/webstore && npm install
+python3 {baseDir}/goh.py webstore install-service
+python3 {baseDir}/goh.py webstore start-service
+python3 {baseDir}/goh.py webstore install-daily 0 0
+python3 {baseDir}/goh.py webstore start-daily
+python3 {baseDir}/goh.py webstore status
+```
+
+如果每日任务发现登录失效，会把服务状态置为 `awaiting_email` 或 `awaiting_code`。后续任意对话中都可以通过 `status` 继续引导，不会因为上一次 agent 对话结束而中断浏览器流程。
+
+#### 清理与排障
+
+- 手动清理等待中的浏览器：`python3 {baseDir}/goh.py webstore cleanup`
+- 查看日志：`python3 {baseDir}/goh.py webstore logs 200`
+- 重启服务：`python3 {baseDir}/goh.py webstore restart-service`
+- 停止每日任务：`python3 {baseDir}/goh.py webstore stop-daily`
+
+安全边界：只领取明确免费的 Webstore 礼物和已达标的 Kessel Run 里程碑；不得点击或调用 `BUY NOW`、真实货币、HKD、水晶/PREMIUM、Pass Plus 等购买动作；不得绕过 EA 验证码/MFA/风控。
 
 ### 搜索与缓存
 

@@ -1,2 +1,5 @@
 names.json
 .cache/
+node_modules/
+webstore/node_modules/
+*.log
